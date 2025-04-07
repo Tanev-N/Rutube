@@ -458,19 +458,17 @@ Rutube — ведущий российский видеопортал, пред�
 | videos          | Cassandra     | `channel_id`, `created_at`                                                                                                                                  | Secondary Index       |
 | search_index    | Elasticsearch | Все поля автоматически индексируются, настроить анализаторы для `title`, `description`, `content` | Full-text index       |
 | comments        | Cassandra     | `video_id`, `prev_comments_id`                                                                                                                              | Secondary Index       |
-| videos_rating   | Cassandra     | `(video_id, user_id)`, `video_id`                                                                                                                           | Composite + Secondary |
-| comments_rating | Cassandra     | `(comments_id, user_id)`, `comments_id`                                                                                                                     | Composite + Secondary |
+| videos_rating   | Cassandra     | `user_id`, `video_id`                                                                                                                                       | Primary + Secondary  |
+| comments_rating | Cassandra     | `user_id`, `comments_id`                                                                                                                                    | Primary + Secondary   |
 | playlists       | Cassandra     | `user_id`                                                                                                                                                     | Secondary Index       |
-| history_videos  | ClickHouse    | `(user_id, created_at)`,  `video_id`                                                                                                                      | Primary + Secondary   |
+| history_videos  | ClickHouse    | `user_id`,  `video_id`                                                                                                                                    | Primary + Secondary   |
 | playlist_videos | Cassandra     | `playlist_id`                                                                                                                                                 | Secondary Index       |
-| subscriptions   | Cassandra     | `(user_id, channel_id)`, `channel_id`                                                                                                                       | Composite + Secondary |
+| subscriptions   | Cassandra     | `user_id`, `channel_id`                                                                                                                                     | Composite + Secondary |
 | sessions        | Cassandra     | `user_id`                                                                                                                                                    | Secondary Index       |
 
 ### Шардирование:
 
-* **subscribers** (4.97B записей) - шардировать по `user_id`
 * **history_videos** (29.04B записей) - шардировать по `user_id`
-* **videos_rating** (1.79B записей) - шардировать по `video_id`
 
 ### Репликация:
 
@@ -478,7 +476,7 @@ Rutube — ведущий российский видеопортал, пред�
 
 #### 1. **Таблицы с высокой частотой чтения (Read-Heavy)**
 
-**Таблицы:** `videos`, `search_index`, `channels`, `users, comments, playlists, playlist_videos`
+**Таблицы:** `videos`, `search_index`, `channels`, `users, comments, playlists, playlist_videos, history_videos`
 
 **Стратегия:**
 
@@ -497,20 +495,8 @@ Rutube — ведущий российский видеопортал, пред�
   * 2-3 мастера, принимающих записи
   * Конфликты разрешаются через `last_write_wins`
 
-#### 3. **Очень большие таблицы (Tiered Replication)**
-
-**Таблицы:** `history_videos`
-
-**Стратегия:** Пользователь редко обращается к старой истории, поэтому делаем партиционирование + репликация
-
-**Горячие/холодные данные** :
-
-* **Горячие** (последние 3 месяца): 3 реплики, высокие IOPS
-* **Холодные** (старше 3 мес): 1 реплика + архив в S3
 
 ## 7. Распределённые алгоритмы.
-
-    |
 
 #### **Общая архитектура системы рекомендаций**
 
